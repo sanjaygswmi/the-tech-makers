@@ -1,0 +1,49 @@
+name: Security and build checks
+
+on:
+  push:
+    branches:
+      - audit/site-revamp-plan
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-checks-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-only-secret-for-ci
+      MONGODB_URI: mongodb://127.0.0.1:27017/ttm-test
+      NEXT_PUBLIC_FRONTEND_URL: https://example.invalid
+      RECAPTCHA_SECRET_KEY: test-only-recaptcha-secret
+      SMTP_HOST: localhost
+      SMTP_PORT: "1025"
+      SMTP_USER: ci@example.invalid
+      SMTP_PASS: test-only-password
+      ADMIN_EMAIL: admin@example.invalid
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+      - name: Run security smoke tests
+        run: npm run test:security
+      - name: Run integration tests
+        run: npm run test:integrations
+      - name: Run lint
+        run: npm run lint
+      - name: Build production bundle
+        run: npm run build

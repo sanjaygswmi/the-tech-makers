@@ -1,0 +1,233 @@
+'use client'
+import React, { useEffect, useState } from 'react'
+import Navbar from '../../components/Navbar'
+import Sidebar from '../../components/Sidebar';
+import Image from 'next/image';
+// import Chip from '@mui/material/Chip';
+import Autocomplete from '@mui/material/Autocomplete';
+import TextField from '@mui/material/TextField';
+import Stack from '@mui/material/Stack';
+import { getToken } from '../../components/utils/utils';
+import { slugify } from '../../components/utils/utils';
+import { useRouter } from 'next/navigation';
+import { showToast } from '../../components/Toster';
+
+
+declare const tinymce: any;
+interface Tag {
+    _id: string;
+    name: string; 
+  }
+
+function Page() {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL
+    const router = useRouter()
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [categoryData, setCategoryData] = useState([])
+    const [tagData, setTagData] = useState([])
+    const [selectedTags, setSelectedTags] = useState([]);
+    const [title, setTitle] = useState('')
+    const [slug, setSlug] = useState('')
+
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleSlug = () => {
+        if (!slug) {
+            setSlug(slugify(title))
+        }
+    }
+
+   
+
+    useEffect(() => {
+        const getCategory = async () => {
+            try {
+                const response = await fetch(`${baseUrl}/category`, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-auth-token": `${getToken()}`,
+                    },
+                })
+                const data = await response.json();
+                setCategoryData(data.category)
+    
+            } catch {
+                // console.log()
+            }
+    
+        }
+        const getTag = async () => {
+            try {
+                const response = await fetch(`${baseUrl}/tag`, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-auth-token": `${getToken()}`,
+                    },
+                })
+                const data = await response.json();
+                setTagData(data.tag)
+    
+            } catch {
+                // console.log()
+            }
+    
+        }
+        getCategory();
+        getTag()
+    }, [baseUrl]);
+
+    const uploadBlogPost = async (event: any) => {
+        event.preventDefault()
+        console.log(selectedTags)
+        const form = event.target;
+        const formData = new FormData(form);
+        selectedTags.forEach((tag:Tag) => formData.append('tag[]', tag._id));
+        try {
+            const response = await fetch(`${baseUrl}/blogs`, {
+                method: 'POST',
+                headers: {
+                    'x-auth-token': `${getToken()}`,
+                },
+                body: formData,
+            });
+
+            const result = await response.json();
+            showToast(result.msg, 'success')
+            router.push('/admin/blog')
+
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
+
+
+    useEffect(() => {
+        tinymce.init({
+            selector: '#mytextarea',
+            license_key: 'gpl|<your-license-key>'
+        });
+    }, [])
+
+
+    return (
+        <>
+            <Sidebar />
+            <Navbar title="Blog Post" />
+            <div className=''>
+                <div className='card-content'>
+                    <form action="" onSubmit={uploadBlogPost}>
+                        <div className='flex flex-wrap bg-white py-[20px] px-[10px]'>
+                            <div className="field w-full md:w-1/2 px-4">
+                                <label className="label">Title</label>
+                                <div className="control">
+                                    <input className="input" type="text" name="title" placeholder="title" defaultValue={title} onChange={(e) => setTitle(e.target.value)} onBlur={handleSlug} />
+                                </div>
+                            </div>
+                            <div className="field w-full md:w-1/2 px-4">
+                                <label className="label">Slug</label>
+                                <div className="control">
+                                    <input className="input" type="text" defaultValue={slug} name="slug" placeholder="Slug" />
+                                </div>
+                            </div>
+                            <div className="field w-full md:w-1/2 px-4 custom-multiple">
+                                <div className='control'>
+                                    <label className="label"> Tag</label>
+
+
+                                    <Stack spacing={3} sx={{ width: 500 }}>
+                                        <Autocomplete
+                                            multiple
+                                            id="tags-standard"
+                                            className='input'
+                                            options={tagData}
+                                            onChange={(event, newValue:any) => setSelectedTags(newValue)}
+                                            getOptionLabel={(option:any) => option.title}
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    variant="standard"
+                                                />
+                                            )}
+                                        />
+                                    </Stack>
+
+                                </div>
+                            </div>
+                            <div className="field w-full md:w-1/2 px-4 choose-image">
+                                <label className="label"> Image</label>
+                                <div className="control">
+                                    <input type='file' name="image" className="input" onChange={handleImageChange} />
+                                </div>
+                                {imagePreview && (
+                                    <div className="mt-4 choose-inner">
+                                        {/* <Image src={imagePreview} alt="Selected" className="h-48 w-48 object-cover" /> */}
+                                        <Image src={imagePreview} alt="Selected" width="200" height="200" className="h-48 w-48 object-cover" />
+                                    </div>
+                                )}
+                            </div>
+                            <div className='field w-full  md:w-1/2 px-4'>
+                                <div className='w-1/2'>
+                                    <label className="label"> Category</label>
+                                    <div className='checkbox-wrapper'>
+                                        {
+                                            categoryData?.map((item: any, index) => {
+                                                return (
+                                                    <div className='check-box' key={index}>
+                                                        <input type='checkbox' value={item._id} name="category[]" id={item._id} />
+                                                        <label htmlFor={item._id}>{item.title}</label>
+                                                    </div>
+                                                )
+                                            })
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="field w-full px-4">
+                                <label className="label">Description</label>
+                                <div className="control">
+                                    <textarea id="mytextarea" className="input" name='description' defaultValue="hello world"></textarea>
+                                </div>
+                            </div>
+
+                            <div className="field w-full md:w-1/2 px-4">
+                                <label className="label">Meta keywords</label>
+                                <div className="control">
+                                    <input className="input" name='metaKeyword' placeholder="Meta keywords" />
+                                </div>
+                            </div>
+                            <div className="field w-full md:w-1/2 px-4">
+                                <label className="label">Meta title</label>
+                                <div className="control">
+                                    <input className="input" name='metaTitle' placeholder="Meta title" />
+                                </div>
+                            </div>
+                            <div className="field w-full px-4">
+                                <label className="label">Meta descriptions</label>
+                                <div className="control">
+                                    <textarea className="input" name='metaDescription' placeholder="Meta descriptions"></textarea>
+                                </div>
+                            </div>
+                            <div className='text-right w-full px-[10px]'>
+                                <input type='submit' className='button blue' />
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </>
+    )
+}
+
+export default Page
